@@ -1,0 +1,1072 @@
+<!DOCTYPE html>
+<html lang="en" class="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nexus Analytics — Interactive Data Dashboard</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts: Inter -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    },
+                    colors: {
+                        primary: {
+                            50: '#eef2ff',
+                            100: '#e0e7ff',
+                            500: '#6366f1',
+                            600: '#4f46e5',
+                            700: '#4338ca',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+<body class="bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100 font-sans antialiased transition-colors duration-200 selection:bg-indigo-500 selection:text-white">
+
+    <!-- Toast Notification Container (Replaces alert) -->
+    <div id="toast-container" class="fixed bottom-5 right-5 z-50 flex flex-col gap-2 pointer-events-none"></div>
+
+    <!-- Custom Data Upload Modal -->
+    <div id="upload-modal" class="fixed inset-0 z-40 hidden items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 transition-opacity">
+        <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl max-w-lg w-full p-6 shadow-2xl transform transition-all">
+            <div class="flex items-center justify-between mb-4">
+                <div class="flex items-center gap-2.5">
+                    <div class="p-2 bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 rounded-xl">
+                        <i data-lucide="upload-cloud" class="w-5 h-5"></i>
+                    </div>
+                    <h3 class="text-lg font-semibold">Import Custom Dataset</h3>
+                </div>
+                <button id="close-modal-btn" class="p-1.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
+                    <i data-lucide="x" class="w-5 h-5"></i>
+                </button>
+            </div>
+            
+            <p class="text-sm text-slate-500 dark:text-slate-400 mb-4">
+                Upload a <code class="px-1.5 py-0.5 bg-slate-100 dark:bg-slate-800 rounded text-xs font-mono">.csv</code> or <code class="px-1.5 py-0.5 bg-slate-100 dark:bg-slate-800 rounded text-xs font-mono">.json</code> file to visualize your own metrics instantly.
+            </p>
+
+            <!-- Drag and Drop Area -->
+            <label for="file-input" id="drop-zone" class="flex flex-col items-center justify-center border-2 border-dashed border-slate-300 dark:border-slate-700 hover:border-indigo-500 dark:hover:border-indigo-500 rounded-xl p-8 text-center cursor-pointer bg-slate-50/50 dark:bg-slate-800/30 transition-colors">
+                <i data-lucide="file-spreadsheet" class="w-10 h-10 text-slate-400 dark:text-slate-500 mb-3"></i>
+                <span class="text-sm font-medium text-slate-700 dark:text-slate-200">Click to upload or drag and drop</span>
+                <span class="text-xs text-slate-500 dark:text-slate-400 mt-1">CSV (Date, Metric1, Metric2, Category) or JSON array</span>
+                <input id="file-input" type="file" accept=".csv,.json" class="hidden" />
+            </label>
+
+            <!-- Sample Template Download & Info -->
+            <div class="mt-4 pt-4 border-t border-slate-100 dark:border-slate-800 flex flex-wrap items-center justify-between gap-2 text-xs text-slate-500 dark:text-slate-400">
+                <span>Need a template to test?</span>
+                <div class="flex gap-2">
+                    <button id="download-sample-csv" class="text-indigo-600 dark:text-indigo-400 hover:underline font-medium flex items-center gap-1">
+                        <i data-lucide="download" class="w-3.5 h-3.5"></i> Sample CSV
+                    </button>
+                    <span>•</span>
+                    <button id="load-demo-custom" class="text-indigo-600 dark:text-indigo-400 hover:underline font-medium">
+                        Load Demo Data
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Layout Wrapper -->
+    <div class="min-h-screen flex flex-col">
+        
+        <!-- Top Navigation Header -->
+        <header class="sticky top-0 z-30 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border-b border-slate-200 dark:border-slate-800">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-4">
+                <!-- Brand Logo -->
+                <div class="flex items-center gap-3">
+                    <div class="w-9 h-9 rounded-xl bg-gradient-to-tr from-indigo-600 to-violet-500 flex items-center justify-center text-white shadow-md shadow-indigo-500/20">
+                        <i data-lucide="bar-chart-3" class="w-5 h-5"></i>
+                    </div>
+                    <div>
+                        <span class="font-bold text-lg tracking-tight block leading-none">Nexus<span class="text-indigo-600 dark:text-indigo-400">BI</span></span>
+                        <span class="text-[11px] text-slate-500 dark:text-slate-400 font-medium">Intelligence Suite</span>
+                    </div>
+                </div>
+
+                <!-- Right Controls -->
+                <div class="flex items-center gap-2 sm:gap-3">
+                    <!-- Upload Data Button -->
+                    <button id="open-upload-btn" class="inline-flex items-center gap-2 px-3.5 py-2 text-xs sm:text-sm font-medium rounded-xl bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-750 shadow-sm transition-all">
+                        <i data-lucide="upload" class="w-4 h-4 text-indigo-600 dark:text-indigo-400"></i>
+                        <span class="hidden sm:inline">Import Data</span>
+                    </button>
+
+                    <!-- Export Report Button -->
+                    <button id="export-csv-btn" class="inline-flex items-center gap-2 px-3.5 py-2 text-xs sm:text-sm font-medium rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white shadow-sm shadow-indigo-600/20 transition-all">
+                        <i data-lucide="download" class="w-4 h-4"></i>
+                        <span class="hidden sm:inline">Export CSV</span>
+                    </button>
+
+                    <!-- Dark/Light Theme Toggle -->
+                    <button id="theme-toggle" aria-label="Toggle Dark Mode" class="p-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors">
+                        <i data-lucide="moon" class="w-4 h-4 block dark:hidden"></i>
+                        <i data-lucide="sun" class="w-4 h-4 hidden dark:block text-amber-400"></i>
+                    </button>
+                </div>
+            </div>
+        </header>
+
+        <!-- Main Dashboard Content -->
+        <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8 space-y-6">
+            
+            <!-- Dashboard Title & Interactive Filter Toolbar -->
+            <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4 bg-white dark:bg-slate-900 p-4 sm:p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
+                <div>
+                    <div class="flex items-center gap-2.5">
+                        <h1 id="dashboard-title" class="text-xl sm:text-2xl font-bold tracking-tight">Sales & Revenue Overview</h1>
+                        <span id="live-badge" class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/60">
+                            <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                            Live Sync
+                        </span>
+                    </div>
+                    <p id="dashboard-subtitle" class="text-sm text-slate-500 dark:text-slate-400 mt-0.5">Real-time financial performance, regional distribution, and conversion metrics.</p>
+                </div>
+
+                <!-- Interactive Controls: Dataset Switcher & Time Range -->
+                <div class="flex flex-wrap items-center gap-3">
+                    <!-- Dataset Switcher -->
+                    <div class="relative">
+                        <label for="dataset-select" class="sr-only">Select Dataset</label>
+                        <div class="flex items-center bg-slate-100 dark:bg-slate-800 rounded-xl px-3 py-2 border border-slate-200/80 dark:border-slate-700">
+                            <i data-lucide="layers" class="w-4 h-4 text-indigo-600 dark:text-indigo-400 mr-2"></i>
+                            <select id="dataset-select" class="bg-transparent text-sm font-medium text-slate-800 dark:text-slate-100 focus:outline-none pr-2 cursor-pointer">
+                                <option value="sales" class="bg-white dark:bg-slate-900">Sales & Revenue</option>
+                                <option value="users" class="bg-white dark:bg-slate-900">User Analytics</option>
+                                <option value="performance" class="bg-white dark:bg-slate-900">System Performance</option>
+                                <option value="custom" id="custom-option" class="bg-white dark:bg-slate-900 hidden">Custom Uploaded Data</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- Time-Range Segmented Control -->
+                    <div class="inline-flex p-1 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200/80 dark:border-slate-700" role="group" aria-label="Time Range">
+                        <button type="button" data-range="7d" class="range-btn px-3 py-1.5 text-xs font-semibold rounded-lg transition-all text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white">
+                            7D
+                        </button>
+                        <button type="button" data-range="30d" class="range-btn active px-3 py-1.5 text-xs font-semibold rounded-lg transition-all bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-sm">
+                            30D
+                        </button>
+                        <button type="button" data-range="ytd" class="range-btn px-3 py-1.5 text-xs font-semibold rounded-lg transition-all text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white">
+                            YTD
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- KPI Summary Cards Grid (4 Columns) -->
+            <section id="kpi-grid" class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 sm:gap-6" aria-label="Key Performance Indicators">
+                <!-- KPI Cards will be dynamically injected via JS for smooth dataset transitions -->
+            </section>
+
+            <!-- Primary Charts Grid (Line Chart + Doughnut Chart) -->
+            <section class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <!-- Trend Over Time (Line/Area Chart - Spans 2 columns on desktop) -->
+                <div class="lg:col-span-2 bg-white dark:bg-slate-900 p-5 sm:p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col">
+                    <div class="flex flex-wrap items-start justify-between gap-2 mb-4">
+                        <div>
+                            <h2 id="line-chart-title" class="text-base sm:text-lg font-semibold">Revenue vs. Target Trend</h2>
+                            <p id="line-chart-subtitle" class="text-xs text-slate-500 dark:text-slate-400">Daily trajectory compared against projected baseline</p>
+                        </div>
+                        <div class="flex items-center gap-4 text-xs font-medium">
+                            <span class="flex items-center gap-1.5">
+                                <span class="w-2.5 h-2.5 rounded-full bg-indigo-500"></span>
+                                <span id="legend-primary">Current Period</span>
+                            </span>
+                            <span class="flex items-center gap-1.5">
+                                <span class="w-2.5 h-2.5 rounded-full bg-emerald-400"></span>
+                                <span id="legend-secondary">Previous / Target</span>
+                            </span>
+                        </div>
+                    </div>
+                    <div class="relative flex-1 min-h-[280px] sm:min-h-[320px] w-full">
+                        <canvas id="trendChart"></canvas>
+                    </div>
+                </div>
+
+                <!-- Distribution Breakdown (Doughnut Chart - Spans 1 column) -->
+                <div class="bg-white dark:bg-slate-900 p-5 sm:p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col">
+                    <div class="mb-4">
+                        <h2 id="doughnut-chart-title" class="text-base sm:text-lg font-semibold">Share by Channel</h2>
+                        <p id="doughnut-chart-subtitle" class="text-xs text-slate-500 dark:text-slate-400">Proportional breakdown across segments</p>
+                    </div>
+                    <div class="relative flex-1 min-h-[240px] flex items-center justify-center">
+                        <canvas id="distributionChart"></canvas>
+                        <!-- Center Doughnut Callout -->
+                        <div class="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                            <span id="doughnut-center-label" class="text-xs font-medium text-slate-400 dark:text-slate-500">Total</span>
+                            <span id="doughnut-center-value" class="text-xl font-bold text-slate-800 dark:text-slate-100">$142.8k</span>
+                        </div>
+                    </div>
+                    <!-- Custom Legend List -->
+                    <div id="doughnut-custom-legend" class="mt-4 pt-3 border-t border-slate-100 dark:border-slate-800 grid grid-cols-2 gap-2 text-xs">
+                        <!-- Dynamically populated -->
+                    </div>
+                </div>
+            </section>
+
+            <!-- Secondary Charts & Data Table Section -->
+            <section class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                <!-- Category Comparison (Bar Chart - 5 cols) -->
+                <div class="lg:col-span-5 bg-white dark:bg-slate-900 p-5 sm:p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col">
+                    <div class="flex items-center justify-between mb-4">
+                        <div>
+                            <h2 id="bar-chart-title" class="text-base sm:text-lg font-semibold">Category Performance</h2>
+                            <p id="bar-chart-subtitle" class="text-xs text-slate-500 dark:text-slate-400">Comparative volume across top categories</p>
+                        </div>
+                        <button id="toggle-bar-orientation" class="p-2 text-xs font-medium rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors" title="Flip Bar Orientation">
+                            <i data-lucide="arrow-left-right" class="w-4 h-4"></i>
+                        </button>
+                    </div>
+                    <div class="relative flex-1 min-h-[260px] w-full">
+                        <canvas id="categoryChart"></canvas>
+                    </div>
+                </div>
+
+                <!-- Granular Data Breakdown Table (7 cols) -->
+                <div class="lg:col-span-7 bg-white dark:bg-slate-900 p-5 sm:p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col">
+                    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+                        <div>
+                            <h2 id="table-title" class="text-base sm:text-lg font-semibold">Recent Activity & Breakdown</h2>
+                            <p class="text-xs text-slate-500 dark:text-slate-400">Filterable granular records for current selection</p>
+                        </div>
+                        <!-- Search Filter -->
+                        <div class="relative">
+                            <i data-lucide="search" class="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2"></i>
+                            <input id="table-search" type="text" placeholder="Filter records..." class="pl-9 pr-3 py-1.5 text-xs sm:text-sm bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/40 w-full sm:w-52 transition-all">
+                        </div>
+                    </div>
+
+                    <div class="overflow-x-auto flex-1">
+                        <table class="w-full text-left border-collapse">
+                            <thead>
+                                <tr id="table-head-row" class="border-b border-slate-200 dark:border-slate-800 text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                                    <!-- Dynamic Headers -->
+                                </tr>
+                            </thead>
+                            <tbody id="table-body" class="divide-y divide-slate-100 dark:divide-slate-800/70 text-sm">
+                                <!-- Dynamic Rows -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+        </main>
+
+        <!-- Footer -->
+        <footer class="border-t border-slate-200 dark:border-slate-800 py-5 px-4 sm:px-6 lg:px-8 mt-8">
+            <div class="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-2 text-xs text-slate-500 dark:text-slate-400">
+                <p>NexusBI Interactive Analytics Dashboard • Built with Chart.js & Tailwind CSS</p>
+                <p>Tip: Hover over any data point for rich tooltips or click <strong>Import Data</strong> to test your own CSV/JSON.</p>
+            </div>
+        </footer>
+    </div>
+
+    <!-- Application JavaScript -->
+    <script>
+        /**
+         * NexusBI Data Visualization Engine
+         * Handles state, curated datasets, CSV/JSON parsing, Chart.js lifecycle, and theme reactivity.
+         */
+        document.addEventListener('DOMContentLoaded', () => {
+            // Initialize Lucide Icons
+            lucide.createIcons();
+
+            // --- 1. APPLICATION STATE ---
+            const state = {
+                datasetKey: 'sales',     // 'sales' | 'users' | 'performance' | 'custom'
+                timeRange: '30d',        // '7d' | '30d' | 'ytd'
+                barHorizontal: false,
+                searchQuery: '',
+                customData: null,
+                charts: {
+                    trend: null,
+                    distribution: null,
+                    category: null
+                }
+            };
+
+            // --- 2. CURATED DATASETS ---
+            const DATASETS = {
+                sales: {
+                    title: 'Sales & Revenue Overview',
+                    subtitle: 'Real-time financial performance, regional distribution, and conversion metrics.',
+                    lineTitle: 'Revenue vs. Target Trajectory',
+                    lineSubtitle: 'Gross revenue compared against forecasted target',
+                    legendPrimary: 'Actual Revenue ($)',
+                    legendSecondary: 'Target Baseline ($)',
+                    doughnutTitle: 'Revenue by Acquisition Channel',
+                    doughnutSubtitle: 'Share of total revenue across channels',
+                    barTitle: 'Revenue by Product Line',
+                    barSubtitle: 'Comparative performance across core offerings',
+                    tableHeaders: ['Period / Label', 'Category', 'Actual ($)', 'Target ($)', 'Growth'],
+                    ranges: {
+                        '7d': {
+                            labels: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
+                            primary: [18400, 21200, 19800, 24500, 28900, 22100, 26400],
+                            secondary: [17500, 19000, 20000, 22000, 25000, 21000, 24000],
+                            kpis: [
+                                { label: 'Total Revenue', value: '$161,300', delta: '+12.4%', positive: true, icon: 'dollar-sign', color: 'indigo' },
+                                { label: 'Avg. Order Value', value: '$148.50', delta: '+4.1%', positive: true, icon: 'shopping-bag', color: 'emerald' },
+                                { label: 'Conversion Rate', value: '3.84%', delta: '+0.6%', positive: true, icon: 'trending-up', color: 'violet' },
+                                { label: 'Refund Rate', value: '1.12%', delta: '-0.3%', positive: true, icon: 'rotate-ccw', color: 'amber' }
+                            ],
+                            doughnut: { labels: ['Direct Web', 'Organic Search', 'Paid Social', 'Partner API'], values: [42, 28, 19, 11], centerLabel: 'Weekly Total', centerValue: '$161.3k' },
+                            bar: { labels: ['Cloud Pro', 'Enterprise', 'Analytics Add-on', 'API Seats', 'Support'], values: [54200, 46800, 28400, 19500, 12400] }
+                        },
+                        '30d': {
+                            labels: ['Wk 1', 'Wk 2', 'Wk 3', 'Wk 4', 'Wk 5', 'Wk 6', 'Wk 7', 'Wk 8'],
+                            primary: [68000, 74500, 71200, 82900, 88400, 91200, 96500, 104200],
+                            secondary: [65000, 70000, 72000, 78000, 82000, 86000, 90000, 95000],
+                            kpis: [
+                                { label: 'Monthly Revenue', value: '$676,900', delta: '+18.2%', positive: true, icon: 'dollar-sign', color: 'indigo' },
+                                { label: 'Avg. Order Value', value: '$156.20', delta: '+6.8%', positive: true, icon: 'shopping-bag', color: 'emerald' },
+                                { label: 'Conversion Rate', value: '4.12%', delta: '+0.9%', positive: true, icon: 'trending-up', color: 'violet' },
+                                { label: 'Customer Churn', value: '1.85%', delta: '-0.4%', positive: true, icon: 'user-minus', color: 'amber' }
+                            ],
+                            doughnut: { labels: ['Direct Web', 'Organic Search', 'Paid Social', 'Partner API'], values: [45, 27, 17, 11], centerLabel: '30D Total', centerValue: '$676.9k' },
+                            bar: { labels: ['Cloud Pro', 'Enterprise', 'Analytics Add-on', 'API Seats', 'Support'], values: [235000, 198000, 112000, 84500, 47400] }
+                        },
+                        'ytd': {
+                            labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov'],
+                            primary: [410000, 445000, 490000, 520000, 565000, 610000, 640000, 685000, 720000, 768000, 815000],
+                            secondary: [390000, 420000, 460000, 495000, 530000, 575000, 610000, 645000, 680000, 720000, 760000],
+                            kpis: [
+                                { label: 'YTD Gross Revenue', value: '$6.67M', delta: '+24.6%', positive: true, icon: 'dollar-sign', color: 'indigo' },
+                                { label: 'Net Dollar Retention', value: '118.4%', delta: '+5.2%', positive: true, icon: 'repeat', color: 'emerald' },
+                                { label: 'Enterprise Deals', value: '342', delta: '+29.0%', positive: true, icon: 'briefcase', color: 'violet' },
+                                { label: 'CAC Payback', value: '5.4 mos', delta: '-1.1 mos', positive: true, icon: 'clock', color: 'amber' }
+                            ],
+                            doughnut: { labels: ['Enterprise Direct', 'Organic Inbound', 'Channel Partners', 'Self-Serve'], values: [48, 24, 18, 10], centerLabel: 'YTD Total', centerValue: '$6.67M' },
+                            bar: { labels: ['Cloud Pro', 'Enterprise', 'Analytics Add-on', 'API Seats', 'Support'], values: [2410000, 1950000, 1080000, 760000, 470000] }
+                        }
+                    }
+                },
+
+                users: {
+                    title: 'User Growth & Engagement Analytics',
+                    subtitle: 'Active user cohorts, session retention, device distribution, and feature adoption.',
+                    lineTitle: 'Active Users vs. New Signups',
+                    lineSubtitle: 'Daily active user trajectory alongside new account registrations',
+                    legendPrimary: 'Active Users',
+                    legendSecondary: 'New Registrations',
+                    doughnutTitle: 'Traffic by Device Platform',
+                    doughnutSubtitle: 'User session share by client environment',
+                    barTitle: 'Feature Adoption Score',
+                    barSubtitle: 'Active engagement across core platform modules',
+                    tableHeaders: ['Cohort / Date', 'Platform', 'Active Users', 'New Signups', 'Retention'],
+                    ranges: {
+                        '7d': {
+                            labels: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
+                            primary: [42100, 44800, 46200, 45900, 48300, 39200, 41500],
+                            secondary: [3200, 3650, 3900, 3750, 4100, 2800, 3150],
+                            kpis: [
+                                { label: 'Weekly Active Users', value: '128.4k', delta: '+9.4%', positive: true, icon: 'users', color: 'indigo' },
+                                { label: 'Avg. Session Time', value: '14m 22s', delta: '+1m 18s', positive: true, icon: 'clock', color: 'emerald' },
+                                { label: 'DAU / MAU Ratio', value: '46.8%', delta: '+2.3%', positive: true, icon: 'activity', color: 'violet' },
+                                { label: 'Bounce Rate', value: '24.1%', delta: '-3.2%', positive: true, icon: 'arrow-down-right', color: 'amber' }
+                            ],
+                            doughnut: { labels: ['Desktop Web', 'iOS App', 'Android App', 'Mobile Web'], values: [52, 26, 15, 7], centerLabel: '7D Sessions', centerValue: '308.0k' },
+                            bar: { labels: ['Dashboards', 'SQL Builder', 'Alerts', 'Exports', 'Team Share'], values: [88, 64, 72, 59, 48] }
+                        },
+                        '30d': {
+                            labels: ['Wk 1', 'Wk 2', 'Wk 3', 'Wk 4', 'Wk 5', 'Wk 6', 'Wk 7', 'Wk 8'],
+                            primary: [112000, 118500, 124000, 129800, 136400, 142100, 149500, 158200],
+                            secondary: [14200, 15800, 16400, 17900, 19200, 20500, 21800, 23400],
+                            kpis: [
+                                { label: 'Monthly Active Users', value: '482.6k', delta: '+15.7%', positive: true, icon: 'users', color: 'indigo' },
+                                { label: 'Avg. Session Time', value: '15m 08s', delta: '+2m 05s', positive: true, icon: 'clock', color: 'emerald' },
+                                { label: '30-Day Retention', value: '68.4%', delta: '+4.1%', positive: true, icon: 'heart', color: 'violet' },
+                                { label: 'NPS Score', value: '64', delta: '+6 pts', positive: true, icon: 'smile', color: 'amber' }
+                            ],
+                            doughnut: { labels: ['Desktop Web', 'iOS App', 'Android App', 'Mobile Web'], values: [49, 28, 16, 7], centerLabel: '30D MAU', centerValue: '482.6k' },
+                            bar: { labels: ['Dashboards', 'SQL Builder', 'Alerts', 'Exports', 'Team Share'], values: [91, 69, 76, 63, 54] }
+                        },
+                        'ytd': {
+                            labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov'],
+                            primary: [240000, 265000, 290000, 315000, 342000, 368000, 395000, 422000, 448000, 465000, 482600],
+                            secondary: [38000, 42000, 47000, 51000, 56000, 61000, 64000, 69000, 73000, 78000, 84000],
+                            kpis: [
+                                { label: 'Total Registered', value: '1.42M', delta: '+41.2%', positive: true, icon: 'users', color: 'indigo' },
+                                { label: 'Power Users', value: '194.5k', delta: '+28.4%', positive: true, icon: 'zap', color: 'emerald' },
+                                { label: 'Viral Coefficient', value: '1.34', delta: '+0.18', positive: true, icon: 'share-2', color: 'violet' },
+                                { label: 'Support Tickets / 1k', value: '2.1', delta: '-0.8', positive: true, icon: 'life-buoy', color: 'amber' }
+                            ],
+                            doughnut: { labels: ['Desktop Web', 'iOS App', 'Android App', 'API Clients'], values: [46, 27, 17, 10], centerLabel: 'Total Users', centerValue: '1.42M' },
+                            bar: { labels: ['Dashboards', 'SQL Builder', 'Alerts', 'Exports', 'Team Share'], values: [94, 74, 81, 68, 61] }
+                        }
+                    }
+                },
+
+                performance: {
+                    title: 'Cloud Infrastructure & API Telemetry',
+                    subtitle: 'Global cluster latency, request throughput, error budgets, and compute utilization.',
+                    lineTitle: 'API Requests/sec vs. P95 Latency (ms)',
+                    lineSubtitle: 'Throughput scaling correlated with tail latency response times',
+                    legendPrimary: 'Throughput (req/s)',
+                    legendSecondary: 'P95 Latency (ms)',
+                    doughnutTitle: 'Traffic by Edge Region',
+                    doughnutSubtitle: 'Global load balancer distribution',
+                    barTitle: 'Latency by Microservice (ms)',
+                    barSubtitle: 'Average response time across core services',
+                    tableHeaders: ['Interval', 'Cluster Region', 'Req / Sec', 'P95 (ms)', 'SLA Status'],
+                    ranges: {
+                        '7d': {
+                            labels: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
+                            primary: [4850, 5120, 5340, 5290, 5610, 4120, 4390],
+                            secondary: [42, 44, 46, 45, 49, 36, 38],
+                            kpis: [
+                                { label: 'System Uptime', value: '99.994%', delta: '+0.004%', positive: true, icon: 'shield-check', color: 'emerald' },
+                                { label: 'Avg. P95 Latency', value: '42.8 ms', delta: '-4.2 ms', positive: true, icon: 'gauge', color: 'indigo' },
+                                { label: 'Peak Throughput', value: '6,840/s', delta: '+14.2%', positive: true, icon: 'cpu', color: 'violet' },
+                                { label: '5xx Error Rate', value: '0.012%', delta: '-0.005%', positive: true, icon: 'alert-circle', color: 'amber' }
+                            ],
+                            doughnut: { labels: ['US-East', 'EU-Central', 'AP-South', 'US-West'], values: [41, 29, 18, 12], centerLabel: 'Avg Load', centerValue: '4,960/s' },
+                            bar: { labels: ['Auth Gateway', 'Query Engine', 'Ingest Pipeline', 'Cache Layer', 'Webhooks'], values: [18, 64, 42, 9, 31] }
+                        },
+                        '30d': {
+                            labels: ['Wk 1', 'Wk 2', 'Wk 3', 'Wk 4', 'Wk 5', 'Wk 6', 'Wk 7', 'Wk 8'],
+                            primary: [4400, 4620, 4890, 5050, 5210, 5480, 5720, 5940],
+                            secondary: [48, 46, 45, 44, 43, 42, 41, 40],
+                            kpis: [
+                                { label: '30-Day Availability', value: '99.992%', delta: '+0.012%', positive: true, icon: 'shield-check', color: 'emerald' },
+                                { label: 'Median Latency', value: '24.5 ms', delta: '-3.1 ms', positive: true, icon: 'gauge', color: 'indigo' },
+                                { label: 'Total Requests', value: '13.4B', delta: '+21.5%', positive: true, icon: 'server', color: 'violet' },
+                                { label: 'Cache Hit Ratio', value: '94.6%', delta: '+1.8%', positive: true, icon: 'database', color: 'amber' }
+                            ],
+                            doughnut: { labels: ['US-East', 'EU-Central', 'AP-South', 'US-West'], values: [39, 30, 19, 12], centerLabel: '30D Requests', centerValue: '13.4B' },
+                            bar: { labels: ['Auth Gateway', 'Query Engine', 'Ingest Pipeline', 'Cache Layer', 'Webhooks'], values: [16, 58, 39, 8, 29] }
+                        },
+                        'ytd': {
+                            labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov'],
+                            primary: [3100, 3350, 3600, 3890, 4150, 4420, 4680, 4950, 5240, 5580, 5940],
+                            secondary: [62, 59, 56, 54, 51, 49, 47, 45, 43, 41, 40],
+                            kpis: [
+                                { label: 'Annual SLA Uptime', value: '99.991%', delta: 'Exceeds SLA', positive: true, icon: 'shield-check', color: 'emerald' },
+                                { label: 'Latency Reduction', value: '-35.4%', delta: 'YoY Gain', positive: true, icon: 'zap', color: 'indigo' },
+                                { label: 'Compute Efficiency', value: '$0.14/M req', delta: '-22.0%', positive: true, icon: 'trending-down', color: 'violet' },
+                                { label: 'Zero-Downtime Deploys', value: '1,284', delta: '100% Pass', positive: true, icon: 'git-merge', color: 'amber' }
+                            ],
+                            doughnut: { labels: ['US-East', 'EU-Central', 'AP-South', 'US-West'], values: [38, 31, 20, 11], centerLabel: 'YTD Requests', centerValue: '148.2B' },
+                            bar: { labels: ['Auth Gateway', 'Query Engine', 'Ingest Pipeline', 'Cache Layer', 'Webhooks'], values: [17, 61, 41, 8, 30] }
+                        }
+                    }
+                }
+            };
+
+            // --- 3. COLOR PALETTES & CHART STYLING HELPERS ---
+            const PALETTE = {
+                indigo: '#6366f1',
+                emerald: '#10b981',
+                violet: '#8b5cf6',
+                amber: '#f59e0b',
+                sky: '#0ea5e9',
+                rose: '#f43f5e'
+            };
+
+            const DOUGHNUT_COLORS = ['#6366f1', '#10b981', '#8b5cf6', '#f59e0b', '#0ea5e9', '#f43f5e'];
+
+            function isDarkMode() {
+                return document.documentElement.classList.contains('dark');
+            }
+
+            function getThemeTokens() {
+                const dark = isDarkMode();
+                return {
+                    textColor: dark ? '#94a3b8' : '#64748b',
+                    headingColor: dark ? '#f1f5f9' : '#0f172a',
+                    gridColor: dark ? 'rgba(51, 65, 85, 0.45)' : 'rgba(226, 232, 240, 0.8)',
+                    tooltipBg: dark ? '#0f172a' : '#ffffff',
+                    tooltipText: dark ? '#f8fafc' : '#0f172a',
+                    tooltipBorder: dark ? '#334155' : '#e2e8f0',
+                    doughnutBorder: dark ? '#0f172a' : '#ffffff'
+                };
+            }
+
+            // --- 4. TOAST NOTIFICATION HELPER ---
+            function showToast(message, type = 'success') {
+                const container = document.getElementById('toast-container');
+                const toast = document.createElement('div');
+                const iconName = type === 'error' ? 'alert-triangle' : 'check-circle-2';
+                const accentClass = type === 'error'
+                    ? 'border-rose-500/40 bg-rose-50 dark:bg-rose-950/90 text-rose-800 dark:text-rose-200'
+                    : 'border-indigo-500/30 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100';
+
+                toast.className = `pointer-events-auto flex items-center gap-2.5 px-4 py-3 rounded-xl border shadow-lg text-xs sm:text-sm font-medium transform transition-all duration-300 translate-y-2 opacity-0 ${accentClass}`;
+                toast.innerHTML = `<i data-lucide="${iconName}" class="w-4 h-4 shrink-0 ${type === 'error' ? 'text-rose-500' : 'text-emerald-500'}"></i><span>${message}</span>`;
+
+                container.appendChild(toast);
+                lucide.createIcons();
+
+                requestAnimationFrame(() => {
+                    toast.classList.remove('translate-y-2', 'opacity-0');
+                });
+
+                setTimeout(() => {
+                    toast.classList.add('opacity-0', 'translate-y-2');
+                    setTimeout(() => toast.remove(), 300);
+                }, 3600);
+            }
+
+            // --- 5. RENDER KPI CARDS ---
+            function renderKPIs(kpis) {
+                const grid = document.getElementById('kpi-grid');
+                const colorMap = {
+                    indigo: 'bg-indigo-50 text-indigo-600 dark:bg-indigo-950/70 dark:text-indigo-400',
+                    emerald: 'bg-emerald-50 text-emerald-600 dark:bg-emerald-950/70 dark:text-emerald-400',
+                    violet: 'bg-violet-50 text-violet-600 dark:bg-violet-950/70 dark:text-violet-400',
+                    amber: 'bg-amber-50 text-amber-600 dark:bg-amber-950/70 dark:text-amber-400'
+                };
+
+                grid.innerHTML = kpis.map(kpi => `
+                    <div class="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm hover:shadow-md hover:border-indigo-500/30 transition-all group">
+                        <div class="flex items-center justify-between mb-3">
+                            <span class="text-xs font-medium text-slate-500 dark:text-slate-400">${kpi.label}</span>
+                            <div class="p-2 rounded-xl ${colorMap[kpi.color] || colorMap.indigo} transition-transform group-hover:scale-105">
+                                <i data-lucide="${kpi.icon}" class="w-4 h-4"></i>
+                            </div>
+                        </div>
+                        <div class="flex items-baseline justify-between gap-2">
+                            <span class="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900 dark:text-white">${kpi.value}</span>
+                            <span class="inline-flex items-center gap-0.5 text-xs font-semibold px-2 py-0.5 rounded-full ${kpi.positive ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/70 dark:text-emerald-400' : 'bg-rose-50 text-rose-700 dark:bg-rose-950/70 dark:text-rose-400'}">
+                                ${kpi.delta}
+                            </span>
+                        </div>
+                    </div>
+                `).join('');
+
+                lucide.createIcons();
+            }
+
+            // --- 6. RENDER & UPDATE CHARTS ---
+            function renderAllCharts(activeData) {
+                const tokens = getThemeTokens();
+
+                // Common Tooltip Configuration
+                const commonTooltip = {
+                    backgroundColor: tokens.tooltipBg,
+                    titleColor: tokens.tooltipText,
+                    bodyColor: tokens.tooltipText,
+                    borderColor: tokens.tooltipBorder,
+                    borderWidth: 1,
+                    padding: 12,
+                    cornerRadius: 10,
+                    displayColors: true,
+                    boxPadding: 5,
+                    titleFont: { family: 'Inter', size: 12, weight: '600' },
+                    bodyFont: { family: 'Inter', size: 12 }
+                };
+
+                // A. LINE / AREA CHART (Trend Over Time)
+                const trendCtx = document.getElementById('trendChart').getContext('2d');
+                if (state.charts.trend) state.charts.trend.destroy();
+
+                const primaryGradient = trendCtx.createLinearGradient(0, 0, 0, 320);
+                primaryGradient.addColorStop(0, 'rgba(99, 102, 241, 0.28)');
+                primaryGradient.addColorStop(1, 'rgba(99, 102, 241, 0.0)');
+
+                state.charts.trend = new Chart(trendCtx, {
+                    type: 'line',
+                    data: {
+                        labels: activeData.labels,
+                        datasets: [
+                            {
+                                label: document.getElementById('legend-primary').textContent,
+                                data: activeData.primary,
+                                borderColor: PALETTE.indigo,
+                                backgroundColor: primaryGradient,
+                                borderWidth: 2.5,
+                                fill: true,
+                                tension: 0.38,
+                                pointRadius: 3.5,
+                                pointHoverRadius: 6,
+                                pointBackgroundColor: PALETTE.indigo,
+                                pointBorderColor: tokens.doughnutBorder,
+                                pointBorderWidth: 2
+                            },
+                            {
+                                label: document.getElementById('legend-secondary').textContent,
+                                data: activeData.secondary,
+                                borderColor: PALETTE.emerald,
+                                backgroundColor: 'transparent',
+                                borderWidth: 2,
+                                borderDash: [5, 5],
+                                fill: false,
+                                tension: 0.38,
+                                pointRadius: 2.5,
+                                pointHoverRadius: 5,
+                                pointBackgroundColor: PALETTE.emerald
+                            }
+                        ]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        interaction: {
+                            mode: 'index',
+                            intersect: false
+                        },
+                        plugins: {
+                            legend: { display: false },
+                            tooltip: commonTooltip
+                        },
+                        scales: {
+                            x: {
+                                grid: { display: false },
+                                ticks: { color: tokens.textColor, font: { family: 'Inter', size: 11 } }
+                            },
+                            y: {
+                                border: { display: false },
+                                grid: { color: tokens.gridColor },
+                                ticks: {
+                                    color: tokens.textColor,
+                                    font: { family: 'Inter', size: 11 },
+                                    callback: (val) => val >= 1000 ? (val / 1000) + 'k' : val
+                                }
+                            }
+                        }
+                    }
+                });
+
+                // B. DOUGHNUT CHART (Distribution Breakdown)
+                const distCtx = document.getElementById('distributionChart').getContext('2d');
+                if (state.charts.distribution) state.charts.distribution.destroy();
+
+                document.getElementById('doughnut-center-label').textContent = activeData.doughnut.centerLabel;
+                document.getElementById('doughnut-center-value').textContent = activeData.doughnut.centerValue;
+
+                state.charts.distribution = new Chart(distCtx, {
+                    type: 'doughnut',
+                    data: {
+                        labels: activeData.doughnut.labels,
+                        datasets: [{
+                            data: activeData.doughnut.values,
+                            backgroundColor: DOUGHNUT_COLORS.slice(0, activeData.doughnut.labels.length),
+                            borderColor: tokens.doughnutBorder,
+                            borderWidth: 3,
+                            hoverOffset: 6
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        cutout: '72%',
+                        plugins: {
+                            legend: { display: false },
+                            tooltip: {
+                                ...commonTooltip,
+                                callbacks: {
+                                    label: (ctx) => ` ${ctx.label}: ${ctx.parsed}%`
+                                }
+                            }
+                        }
+                    }
+                });
+
+                // Populate Custom Doughnut Legend
+                const customLegend = document.getElementById('doughnut-custom-legend');
+                customLegend.innerHTML = activeData.doughnut.labels.map((lbl, idx) => `
+                    <div class="flex items-center justify-between px-2 py-1 rounded-lg bg-slate-50 dark:bg-slate-800/60">
+                        <div class="flex items-center gap-1.5 truncate">
+                            <span class="w-2.5 h-2.5 rounded-full shrink-0" style="background-color: ${DOUGHNUT_COLORS[idx % DOUGHNUT_COLORS.length]}"></span>
+                            <span class="truncate text-slate-600 dark:text-slate-300">${lbl}</span>
+                        </div>
+                        <span class="font-semibold text-slate-900 dark:text-slate-100 ml-1">${activeData.doughnut.values[idx]}%</span>
+                    </div>
+                `).join('');
+
+                // C. BAR CHART (Category Comparison)
+                const catCtx = document.getElementById('categoryChart').getContext('2d');
+                if (state.charts.category) state.charts.category.destroy();
+
+                state.charts.category = new Chart(catCtx, {
+                    type: 'bar',
+                    data: {
+                        labels: activeData.bar.labels,
+                        datasets: [{
+                            label: 'Volume / Score',
+                            data: activeData.bar.values,
+                            backgroundColor: [
+                                'rgba(99, 102, 241, 0.85)',
+                                'rgba(139, 92, 246, 0.85)',
+                                'rgba(16, 185, 129, 0.85)',
+                                'rgba(14, 165, 233, 0.85)',
+                                'rgba(245, 158, 11, 0.85)'
+                            ],
+                            borderRadius: 8,
+                            borderSkipped: false,
+                            maxBarThickness: 36
+                        }]
+                    },
+                    options: {
+                        indexAxis: state.barHorizontal ? 'y' : 'x',
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: { display: false },
+                            tooltip: commonTooltip
+                        },
+                        scales: {
+                            x: {
+                                grid: { display: state.barHorizontal, color: tokens.gridColor },
+                                ticks: {
+                                    color: tokens.textColor,
+                                    font: { family: 'Inter', size: 11 },
+                                    callback: function(val) {
+                                        const raw = this.getLabelForValue(val);
+                                        return typeof raw === 'number' && raw >= 1000 ? (raw / 1000) + 'k' : raw;
+                                    }
+                                }
+                            },
+                            y: {
+                                border: { display: false },
+                                grid: { display: !state.barHorizontal, color: tokens.gridColor },
+                                ticks: {
+                                    color: tokens.textColor,
+                                    font: { family: 'Inter', size: 11 },
+                                    callback: function(val) {
+                                        const raw = this.getLabelForValue(val);
+                                        return typeof raw === 'number' && raw >= 1000 ? (raw / 1000) + 'k' : raw;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                });
+            }
+
+            // --- 7. RENDER DATA TABLE ---
+            function renderTable(datasetMeta, activeData) {
+                const headRow = document.getElementById('table-head-row');
+                const tbody = document.getElementById('table-body');
+
+                headRow.innerHTML = datasetMeta.tableHeaders.map((h, i) => `
+                    <th class="py-2.5 px-3 ${i >= 2 ? 'text-right' : 'text-left'}">${h}</th>
+                `).join('');
+
+                // Build rows from activeData labels + primary/secondary series
+                const categories = activeData.doughnut.labels;
+                const rows = activeData.labels.map((label, idx) => {
+                    const pVal = activeData.primary[idx] ?? 0;
+                    const sVal = activeData.secondary[idx] ?? 0;
+                    const diff = sVal !== 0 ? (((pVal - sVal) / sVal) * 100).toFixed(1) : '0.0';
+                    const isPos = parseFloat(diff) >= 0;
+                    const cat = categories[idx % categories.length];
+                    return { label, cat, pVal, sVal, diff, isPos };
+                }).filter(row => {
+                    if (!state.searchQuery) return true;
+                    const q = state.searchQuery.toLowerCase();
+                    return row.label.toLowerCase().includes(q) || row.cat.toLowerCase().includes(q);
+                });
+
+                if (rows.length === 0) {
+                    tbody.innerHTML = `<tr><td colspan="5" class="py-8 text-center text-xs text-slate-400">No matching records found for "${state.searchQuery}"</td></tr>`;
+                    return;
+                }
+
+                tbody.innerHTML = rows.map(r => `
+                    <tr class="hover:bg-slate-50/80 dark:hover:bg-slate-800/40 transition-colors">
+                        <td class="py-2.5 px-3 font-medium text-slate-800 dark:text-slate-200">${r.label}</td>
+                        <td class="py-2.5 px-3">
+                            <span class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300">
+                                ${r.cat}
+                            </span>
+                        </td>
+                        <td class="py-2.5 px-3 text-right font-semibold tabular-nums">${r.pVal.toLocaleString()}</td>
+                        <td class="py-2.5 px-3 text-right text-slate-500 dark:text-slate-400 tabular-nums">${r.sVal.toLocaleString()}</td>
+                        <td class="py-2.5 px-3 text-right">
+                            <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold ${r.isPos ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-400' : 'bg-rose-50 text-rose-700 dark:bg-rose-950/60 dark:text-rose-400'}">
+                                ${r.isPos ? '+' : ''}${r.diff}%
+                            </span>
+                        </td>
+                    </tr>
+                `).join('');
+            }
+
+            // --- 8. MASTER DASHBOARD REFRESH ---
+            function updateDashboard() {
+                const datasetMeta = state.datasetKey === 'custom' && state.customData
+                    ? state.customData
+                    : DATASETS[state.datasetKey];
+
+                const activeData = datasetMeta.ranges[state.timeRange] || datasetMeta.ranges['30d'];
+
+                // Update Headers & Titles
+                document.getElementById('dashboard-title').textContent = datasetMeta.title;
+                document.getElementById('dashboard-subtitle').textContent = datasetMeta.subtitle;
+                document.getElementById('line-chart-title').textContent = datasetMeta.lineTitle;
+                document.getElementById('line-chart-subtitle').textContent = datasetMeta.lineSubtitle;
+                document.getElementById('legend-primary').textContent = datasetMeta.legendPrimary;
+                document.getElementById('legend-secondary').textContent = datasetMeta.legendSecondary;
+                document.getElementById('doughnut-chart-title').textContent = datasetMeta.doughnutTitle;
+                document.getElementById('doughnut-chart-subtitle').textContent = datasetMeta.doughnutSubtitle;
+                document.getElementById('bar-chart-title').textContent = datasetMeta.barTitle;
+                document.getElementById('bar-chart-subtitle').textContent = datasetMeta.barSubtitle;
+
+                renderKPIs(activeData.kpis);
+                renderAllCharts(activeData);
+                renderTable(datasetMeta, activeData);
+            }
+
+            // --- 9. CUSTOM CSV / JSON PARSING ENGINE ---
+            function parseAndLoadCustomData(rawText, fileName) {
+                try {
+                    let records = [];
+                    if (fileName.endsWith('.json')) {
+                        const parsed = JSON.parse(rawText);
+                        records = Array.isArray(parsed) ? parsed : (parsed.data || []);
+                    } else {
+                        // CSV Parser
+                        const lines = rawText.trim().split(/\r?\n/).filter(l => l.trim());
+                        if (lines.length < 2) throw new Error('CSV must contain a header row and at least one data row.');
+                        const headers = lines[0].split(',').map(h => h.trim().replace(/^"|"$/g, ''));
+                        records = lines.slice(1).map(line => {
+                            const vals = line.split(',').map(v => v.trim().replace(/^"|"$/g, ''));
+                            const obj = {};
+                            headers.forEach((h, idx) => obj[h] = vals[idx]);
+                            return obj;
+                        });
+                    }
+
+                    if (!records.length) throw new Error('No valid records found in file.');
+
+                    const keys = Object.keys(records[0]);
+                    if (keys.length < 2) throw new Error('Dataset needs at least 2 columns (Label & Value).');
+
+                    // Detect label column, numeric columns, and optional category column
+                    const labelKey = keys[0];
+                    const numericKeys = keys.filter(k => k !== labelKey && !isNaN(parseFloat(records[0][k])));
+                    const categoryKey = keys.find(k => k !== labelKey && !numericKeys.includes(k));
+
+                    if (numericKeys.length === 0) throw new Error('Could not find numeric columns to chart.');
+
+                    const primaryKey = numericKeys[0];
+                    const secondaryKey = numericKeys[1] || numericKeys[0];
+
+                    const labels = records.map(r => String(r[labelKey]));
+                    const primaryVals = records.map(r => parseFloat(r[primaryKey]) || 0);
+                    const secondaryVals = numericKeys[1]
+                        ? records.map(r => parseFloat(r[secondaryKey]) || 0)
+                        : primaryVals.map(v => Math.round(v * 0.9));
+
+                    // Aggregate categories for Doughnut & Bar
+                    const catMap = {};
+                    records.forEach((r, idx) => {
+                        const cat = categoryKey ? (r[categoryKey] || 'General') : `Segment ${(idx % 4) + 1}`;
+                        catMap[cat] = (catMap[cat] || 0) + primaryVals[idx];
+                    });
+
+                    const catLabels = Object.keys(catMap).slice(0, 6);
+                    const catRawVals = catLabels.map(c => catMap[c]);
+                    const totalSum = catRawVals.reduce((a, b) => a + b, 0) || 1;
+                    const catPercentages = catRawVals.map(v => Math.round((v / totalSum) * 100));
+
+                    const avgPrimary = (primaryVals.reduce((a, b) => a + b, 0) / primaryVals.length).toFixed(1);
+                    const maxPrimary = Math.max(...primaryVals).toLocaleString();
+
+                    const customRangeObj = {
+                        labels,
+                        primary: primaryVals,
+                        secondary: secondaryVals,
+                        kpis: [
+                            { label: `Total ${primaryKey}`, value: totalSum.toLocaleString(), delta: 'Uploaded', positive: true, icon: 'database', color: 'indigo' },
+                            { label: `Average ${primaryKey}`, value: Number(avgPrimary).toLocaleString(), delta: `${records.length} rows`, positive: true, icon: 'bar-chart-2', color: 'emerald' },
+                            { label: `Peak ${primaryKey}`, value: maxPrimary, delta: 'Max Value', positive: true, icon: 'trending-up', color: 'violet' },
+                            { label: 'Categories', value: String(catLabels.length), delta: 'Active', positive: true, icon: 'layers', color: 'amber' }
+                        ],
+                        doughnut: {
+                            labels: catLabels,
+                            values: catPercentages,
+                            centerLabel: 'Total Sum',
+                            centerValue: totalSum >= 1000 ? (totalSum / 1000).toFixed(1) + 'k' : String(totalSum)
+                        },
+                        bar: {
+                            labels: catLabels,
+                            values: catRawVals
+                        }
+                    };
+
+                    state.customData = {
+                        title: `Custom Dataset: ${fileName}`,
+                        subtitle: `Visualizing ${records.length} imported records across ${keys.length} fields.`,
+                        lineTitle: `${primaryKey} vs. ${numericKeys[1] || 'Baseline'} Trend`,
+                        lineSubtitle: `Plotted across ${labelKey}`,
+                        legendPrimary: primaryKey,
+                        legendSecondary: numericKeys[1] || '90% Baseline',
+                        doughnutTitle: `Distribution by ${categoryKey || 'Segment'}`,
+                        doughnutSubtitle: 'Percentage share of total volume',
+                        barTitle: `${primaryKey} by Category`,
+                        barSubtitle: 'Aggregated comparison',
+                        tableHeaders: [labelKey, categoryKey || 'Segment', primaryKey, numericKeys[1] || 'Baseline', 'Variance'],
+                        ranges: {
+                            '7d': customRangeObj,
+                            '30d': customRangeObj,
+                            'ytd': customRangeObj
+                        }
+                    };
+
+                    const customOpt = document.getElementById('custom-option');
+                    customOpt.classList.remove('hidden');
+                    customOpt.textContent = `Custom: ${fileName}`;
+                    document.getElementById('dataset-select').value = 'custom';
+                    state.datasetKey = 'custom';
+
+                    closeUploadModal();
+                    updateDashboard();
+                    showToast(`Loaded "${fileName}" (${records.length} records) successfully!`);
+                } catch (err) {
+                    showToast(err.message || 'Failed to parse file.', 'error');
+                }
+            }
+
+            // --- 10. EVENT LISTENERS ---
+
+            // Theme Toggle
+            document.getElementById('theme-toggle').addEventListener('click', () => {
+                document.documentElement.classList.toggle('dark');
+                updateDashboard();
+            });
+
+            // Dataset Switcher
+            document.getElementById('dataset-select').addEventListener('change', (e) => {
+                state.datasetKey = e.target.value;
+                updateDashboard();
+            });
+
+            // Time-Range Buttons
+            document.querySelectorAll('.range-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    document.querySelectorAll('.range-btn').forEach(b => {
+                        b.classList.remove('active', 'bg-white', 'dark:bg-slate-900', 'text-indigo-600', 'dark:text-indigo-400', 'shadow-sm');
+                        b.classList.add('text-slate-600', 'dark:text-slate-400');
+                    });
+                    btn.classList.add('active', 'bg-white', 'dark:bg-slate-900', 'text-indigo-600', 'dark:text-indigo-400', 'shadow-sm');
+                    btn.classList.remove('text-slate-600', 'dark:text-slate-400');
+                    state.timeRange = btn.dataset.range;
+                    updateDashboard();
+                });
+            });
+
+            // Toggle Bar Orientation
+            document.getElementById('toggle-bar-orientation').addEventListener('click', () => {
+                state.barHorizontal = !state.barHorizontal;
+                updateDashboard();
+            });
+
+            // Table Search Input
+            document.getElementById('table-search').addEventListener('input', (e) => {
+                state.searchQuery = e.target.value;
+                const datasetMeta = state.datasetKey === 'custom' && state.customData ? state.customData : DATASETS[state.datasetKey];
+                const activeData = datasetMeta.ranges[state.timeRange] || datasetMeta.ranges['30d'];
+                renderTable(datasetMeta, activeData);
+            });
+
+            // Export Current View as CSV
+            document.getElementById('export-csv-btn').addEventListener('click', () => {
+                const datasetMeta = state.datasetKey === 'custom' && state.customData ? state.customData : DATASETS[state.datasetKey];
+                const activeData = datasetMeta.ranges[state.timeRange] || datasetMeta.ranges['30d'];
+
+                const csvRows = [
+                    ['Label', datasetMeta.legendPrimary, datasetMeta.legendSecondary].join(','),
+                    ...activeData.labels.map((lbl, i) => `"${lbl}",${activeData.primary[i]},${activeData.secondary[i]}`)
+                ];
+                const blob = new Blob([csvRows.join('\n')], { type: 'text/csv;charset=utf-8;' });
+                const url = URL.createObjectURL(blob);
+                const link = document.createElement('a');
+                link.href = url;
+                link.download = `nexusbi_${state.datasetKey}_${state.timeRange}.csv`;
+                link.click();
+                URL.revokeObjectURL(url);
+                showToast('Exported current dashboard view to CSV.');
+            });
+
+            // Upload Modal Controls
+            const modal = document.getElementById('upload-modal');
+            const openUploadModal = () => {
+                modal.classList.remove('hidden');
+                modal.classList.add('flex');
+            };
+            const closeUploadModal = () => {
+                modal.classList.add('hidden');
+                modal.classList.remove('flex');
+            };
+
+            document.getElementById('open-upload-btn').addEventListener('click', openUploadModal);
+            document.getElementById('close-modal-btn').addEventListener('click', closeUploadModal);
+            modal.addEventListener('click', (e) => {
+                if (e.target === modal) closeUploadModal();
+            });
+
+            // File Input & Drag-and-Drop
+            const fileInput = document.getElementById('file-input');
+            const dropZone = document.getElementById('drop-zone');
+
+            fileInput.addEventListener('change', (e) => {
+                const file = e.target.files[0];
+                if (!file) return;
+                const reader = new FileReader();
+                reader.onload = (ev) => parseAndLoadCustomData(ev.target.result, file.name);
+                reader.readAsText(file);
+            });
+
+            dropZone.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                dropZone.classList.add('border-indigo-500', 'bg-indigo-50/40', 'dark:bg-indigo-950/30');
+            });
+
+            dropZone.addEventListener('dragleave', () => {
+                dropZone.classList.remove('border-indigo-500', 'bg-indigo-50/40', 'dark:bg-indigo-950/30');
+            });
+
+            dropZone.addEventListener('drop', (e) => {
+                e.preventDefault();
+                dropZone.classList.remove('border-indigo-500', 'bg-indigo-50/40', 'dark:bg-indigo-950/30');
+                const file = e.dataTransfer.files[0];
+                if (!file) return;
+                const reader = new FileReader();
+                reader.onload = (ev) => parseAndLoadCustomData(ev.target.result, file.name);
+                reader.readAsText(file);
+            });
+
+            // Sample CSV Download & Instant Demo Load
+            const SAMPLE_CSV = `Month,Revenue,Expenses,Region\nJan,45200,28100,North America\nFeb,51800,30400,Europe\nMar,49600,29200,Asia Pacific\nApr,62400,33100,North America\nMay,68900,35800,Europe\nJun,74200,37900,Latin America`;
+
+            document.getElementById('download-sample-csv').addEventListener('click', () => {
+                const blob = new Blob([SAMPLE_CSV], { type: 'text/csv;charset=utf-8;' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'sample_regional_metrics.csv';
+                a.click();
+                URL.revokeObjectURL(url);
+            });
+
+            document.getElementById('load-demo-custom').addEventListener('click', () => {
+                parseAndLoadCustomData(SAMPLE_CSV, 'sample_regional_metrics.csv');
+            });
+
+            // Initial Render
+            updateDashboard();
+        });
+    </script>
+</body>
+</html>
